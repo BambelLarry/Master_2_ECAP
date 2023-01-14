@@ -51,6 +51,7 @@ Le premier indicateur correspond au continent de production du film basé sur la
 Nous avons remarqué que la distribution des films n'étaient pas équlibré. Les Etats-Unis et l'Italie concentrent plus de la moitié des pays producteurs de notre base (59,69 % du dataset au moment du traitement). Nous avons préféré les regrouper par continents.
 
 De plus, certains films ont plusieurs pays producteurs, dont certains de plusieurs continents différents. Pour facilité le traitement, nous avons considéré que ces films étaient "internationaux". Certains films produits par plusieurs pays européens par exemple, sont alors considéré comme internationaux.
+
 ![image](https://user-images.githubusercontent.com/117921986/212486192-ee40d430-5449-4d1b-a95d-ef3f63c73eea.png)
 
 Pour le traitement des pays nous avons utilisé les librairies pycountry et pycountry_convert. Le premier nous donne la liste des pays du monde (pas complète). La seconde convertie le nom du pays en continent.
@@ -62,6 +63,7 @@ Voici la liste des traitements pour convertir le nom de pays en continent :
 4. Pour les pays ne pouvant pas être converti nous les avons directement affecté au contient. Il s'agit d'ancien pays comme "Soviet Union", "Czechoslovakia" ou "East Germany". Nous les avons tous affecté en Europe, sauf pour "Soviet Union" que nous avons considéré en Asie.
 
 La distribution des continents est la suivante :
+
 ![image](https://user-images.githubusercontent.com/117921986/212487318-debcbeb1-5df3-47ee-afa9-78173324916c.png)
 
 Encore une fois, la distribution des contients est déséquilibrés. Pour palier à ce déséquilibre et ne pas avoir trop de modalité, nous avons regroupé l'ensemble des contient hors Europe et Amérique du Nord. La distribution est à présent la suivante : 
@@ -70,8 +72,9 @@ Encore une fois, la distribution des contients est déséquilibrés. Pour palier
 
 Pour rendre exploitable la variable du continent dans nos modèles, nous l'avons transformée en 3 variables muettes. Il s'agit de variables binaires. La variable muette "EU" est créée pour les films européens, "NA" pour les films nord américains et "Inter" pour les films internationaux (et des autres continents). Evidemment, chaque film possède un 1 dans une des trois variables et deux 0 dans les deux autres (un film étant produit que sur un continent).
 
-3. Indicateur de sentiments de la description
+2. Indicateur de sentiments de la description
 
+Nous supposons que la description des films drame sont plus négative que celle des comédies
 Le résumé du film ("description") est une forme abrégée du contenu du film. Il nous permet de connaitre dans les grandes lignes ce qui s'y déroule. Il s'agit d'un élément important prédéfinissant en amont le genre du film. C'est la raison pour laquelle nous avons créé un indicateur de sentiments sur cette variable.
 
 Nous avons utilisé l'approche lexical de la méthode NLP pour créer l'indicateur de sentiment. Cette approche se base sur une liste de mots de références créer manuellement. Ici, nous avons utilisé la liste de référence Opinion Lexicon de la librairie nltk.corpus. Il s'agit de deux listes de mots : une composée de mots positifs et l'autres de mots négatifs. Nous comptons simplement le nombre de mots en communs de ces listes avec les termes du résumé du film.
@@ -91,7 +94,53 @@ Enfin, les mots avec une polarité (positive ou négative) dans un texte sont la
 Malgré ces limites de notre indicateurs de sentiments basé sur l'Opinion Lexicon nous donne un aperçu global du ton du texte.
 Nous supposons que les drames ont principalement des résumés considérés comme négatif et les comédies des résumés positifs.
 
-5. Indicateur d'expérience précédente du casting et du réalisateur
+
+4. Indicateur d'expérience précédente du casting et du réalisateur
+Nous pouvons remarqué que certains acteurs et réalisateurs sont associés à certains types de films. Par exemple, l'acteur Jim Carrey est connu pour ses premiers rôles dans des comédies comme "Ace Ventura", "The Truman Show" ou "The Mask". Grâce à l'expérience du casting et du réalisateur, nous pourrions mieux supposer le genre du film. C'est pour cela que nous avons créé l'indicateur de la part de comédie dans l'expérience du casting sur l'ensemble des films (comédie+tragédie) dans lesquels les acteurs ont joué.
+
+Nous avons créé ces indicateurs séparemment pour les et les réalisateurs, même si le processus est le même. Nous allons présenter l'indicateur pour les acteurs.
+
+Au départ, nous avions comptabilisé le nombre de comédie et de drame dans lesquels chaque acteur avait joué, indépendamment de la date de sortie du film. Puis, nous sommions le nombre de comédie/drame de l'ensemble des acteurs du casting pour créer l'indicateur d'expérience. Néanmoins, cela signifie que pour un film sortie en 1960 par exemple, nous comptabilisions le nombre de comédie et de drame du casting sortie après. De plus, nous nous posions la question si fallait prendre en compte le film de 1960 dans la somme du casting.
+Par ailleurs, cet indicateur se basait sur notre variable à expliquer. Comme nous sommes supposer la prédire, nous avions imaginé de créer cet indicateur que sur une base Train. Donc, que pour la base Test, l'indicateur se baserait sur l'échantillon Test.
+En outre, nous nous demandions s'il fallait pondéré le nombre de comédie/drame par le nombre d'acteur dans le casting. En effet, un casting nombreux sur un film augmente logiquement l'expérience global.
+
+Cette première approche contenait plusieurs problèmes, questionnements et limites. Suite à des discussion avec @Roulitoo, nous avons modifié notre approche pour revenir à un indicateur plus simple : l'expérience précédente du casting dans les comédies et drames. Cela suppose donc que pour le film sortie en 1960, nous ne prenons en compte que l'expérience des acteurs avant la sortie du dit film.
+
+Pour cela, nous avons créé une base de données des acteurs avec pour chaque observation l'acteur et le film dans lequel il a joué. Nous avons aussi ajouté l'année de sortie du film. Puis, pour chaque couple acteur-film, nous avons compté le nombre de comédie et drame dans lequel l'acteur a joué avant l'année de sortie du film. Le principe fonctionne un peu comme un filtre : d'abord on filtre sur l'acteur, puis on filtre sur la date de sortie du film. Voilà comment cette base des acteurs est représenté pour un acteur, ici "Kim Rossi Stuart".
+
+![image](https://user-images.githubusercontent.com/117921986/212498840-f00d5fec-ab1f-46b6-a144-f1753f4f6aff.png)
+
+Ensuite, nous avons simplement fusionné notre base des acteurs avec celle des films en sommant pour l'ensemble du casting. Nous obtenons pour chaque film le nombre de comédie et drame (séparément) dans lequel a joué le casting avant.
+
+Enfin, nous avons calculé l'indicateur de la part de comédie d'expérience sur l'ensemble des films d'expérience (comédie et drame). Cet indicateur nous permet d'éviter le problème d'inégalité entre des films avec des gros casting et ceux avec des casting peu connu avec peu d'expérience. En effet, cet indicateur varie entre 0 si le casting n'a que des expériences dans les drames et 1 si il n'a que des expériences dans les comédies. Cet indicateur est vue comme une jauge avec pour milieu 0.5. Cela signifie que le casting a autant d'expérience dans les comédies que dans les drames.
+Cependant, il peut arriver pour certains films que le casting n'ait aucune expérience. Dans ces cas là, nous les affectons à 0.5, le juste équilibre.
+
+De plus, nous avons ajouté dans la base l'expérience total du casting (somme du nombre de comédie et de drame dans lequel a joué le casting).
+
+
+
+Toutefois, bien que nous implémentons ces indicateurs dans la base, il possède tout de même quelques limites :
+-Il est probable que certains acteurs aient le même nom et prénom. Ils peuvent fausser l'indicateur, mais nous ne pouvons rien y faire (hormis vérifier l'ensemble des films à la main)
+-Comme nous n'avons pas la date précise de sortie du film, seulement l'année. Donc, l'indicateur exclu les films sortie la même année (même s'ils sont sortis à une date antérieur). Cela a probablement peu d'impact sur notre indicateur au final.
+-L'expérience du casting se base seulement sur les films présents dans la base et non sur l'ensemble des films de la carrière des acteurs. 
+-La non expérience de certain casting fait que 0.5 devient la classe modale de la variable. Cela est plus flagrant sur la distribution pour les producteurs.
+
+Distribution de l'indicateur de la part de comédie dans l'expérience du casting, et l'expérience du casting :
+
+
+![image](https://user-images.githubusercontent.com/117921986/212499991-064628fd-bc6a-45f8-b7bd-92b565da807e.png)
+![image](https://user-images.githubusercontent.com/117921986/212500057-a80b16b0-9e22-47e0-9721-bd964e248434.png)
+
+
+Le même processus et calcul a été réalisé pour les réalisteurs. Néanmoins, les réalisateurs travaillent sur moins de films en moyenne que les acteurs : 6,69 films par acteur contre 1,05 film par réalisateur. Cela fait que beaucoup de réalisateurs n'ont qu'une seule expérience. Donc, que nous affectons pour une grande partie des réalisateurs la valeur de 0.5. De plus, l'expérience des réalisateurs est assez inégale. Une grande majorité des réalisateurs n'ont pas d'expérience.
+
+Distribution de l'indicateur de la part de comédie dans l'expérience du réalisateur, et l'expérience du réalisateur :
+
+![image](https://user-images.githubusercontent.com/117921986/212500311-74759152-f272-45fa-83dc-eda7afb24361.png)
+![image](https://user-images.githubusercontent.com/117921986/212500313-70965514-3396-480e-bf89-a4a20bec375b.png)
+
+Cependant, la distribution de l'indicateur de la part de comédie des réalisateurs est trop particulière. En effet, elle est séparé en 3 grands groupe : les 0, les 0.5 et les 1. De notre point de vue, cette distribution est trop particulière pour qu'on l'ajoute dans nos modèles. Nous avons tout de même essayé de créer 3 variables qualitatives muettes avec pour intervalle [0;0,33], [0,33;0,67] et [0,67;1]. Nous avons testé ces variables muettes dans une sélection de variable, mais ces variables faisait partie des dernières sélectionnées (cf partie).
+
 
 D. Traitement des valeurs atypiques (Déjà faite, à améliorer)
 1. Potentiel valeurs atypiques
